@@ -1,17 +1,19 @@
 {
     "manifest_version": 2,
-    "name": "chrome-extension-template",
+    "name": "Pagemark",
     "version": "1.0",
     "description": "Chrome extension boilerplate, replace all values!",
 
     "browser_action": {
-        "default_title": "Boilerplate popup!",
-        "default_popup": "src/views/popup.html"
+        "default_title": "Pagemark\n\nDouble click to set a pagemark at current position\nSingle click to go to next pagemark\nCTRL-CLICK to delete current pagemark\nCTRL-ALT-CLICK to delete all pagemarks on the page",
+        "default_icon": "src/images/48x48.png"
     },
     "content_scripts": [
         {
-            "matches": ["<all_urls>"],
-            "js": ["src/js/in-content.js"]
+            "all_frames": true,
+            "matches":  [ "http://*/*", "https://*/*", "file:///*/*" ],
+            "js": ["src/js/taffy.js", "src/js/pmCommon.js", "src/js/pmContent.js", "src/js/propsConsole.js" ],
+            "run_at": "document_end"
         }
     ],
 
@@ -22,12 +24,19 @@
     },
 
     "background": {
-        "scripts": ["src/js/background.js"],
+        "page": "src/views/sandbox.html",
         "persistent": false
     },
 
-    "content_security_policy":
-        "script-src 'self' 'unsafe-eval'; object-src 'self'; img-src * data: 'self' 'unsafe-eval'",
+    "content_security_policy": "script-src 'self' https://apis.google.com; object-src 'self'",
     "offline_enabled": true,
-    "permissions": ["tabs", "<all_urls>", "activeTab"]
+    "description": "help to remember your position on any pages",
+    "options_ui": {
+        "chrome_style": false,
+        "open_in_tab": true,
+        "page": "src/views/pagemarkOptions.html"
+    },
+    "permissions": [ "activeTab", "storage", "tabs", "https://accounts.google.com/*", "https://www.googleapis.com/*", "http://*/", "https://*/", "file:///*/*" ],
+    "short_name": "Pagemark",
+    "web_accessible_resources": [ "src/views/pagemarkOptions.html", "src/images/pmEnd.png" ]
 }
