@@ -224,3 +224,4 @@ function deleteAllPms(){
     window.focus();
     return true;
 }
+module.exports = pagemark;
