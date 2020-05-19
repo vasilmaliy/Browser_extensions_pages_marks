@@ -1,6 +1,3 @@
-// pagemark.js	 - Background page
-// Chuck Baker
-// SoftwareByChuck.com
 
 window.addEventListener("load", pmInit);
 
