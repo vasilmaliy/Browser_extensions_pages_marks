@@ -1,5 +1,4 @@
 // pmCommon.js - Pagemark
-// Chuck Baker
 // Global objects
 
 if(typeof pmData === 'undefined') var pmData = {};
@@ -8,7 +7,9 @@ var PagemarkDb  = TAFFY();
 var pmExtId = chrome.runtime.id;
 var ctrlPressed = false;
 var altPressed = false;
-
+/**
+ * This function initializes all global extension data
+ */
 function initGlobalData(){
     pmData = {};
     pmData.pagemarkData = [];
@@ -23,7 +24,11 @@ function initGlobalData(){
     //pmData.license.installDate = new Date().getTime();
     return true;
 }
-
+/**
+ * This function load the data from storage
+ * PagemarkDb: id, title, url, position
+ * @param {object} callback 
+ */
 function loadFromStorage(callback){
     chrome.storage.local.get(null, function(saveData){
         if(typeof saveData.pagemarkData === 'undefined'){
@@ -42,10 +47,12 @@ function loadFromStorage(callback){
     });
     return true;
 }
-
+/**
+ * This function save the data to storage
+ * PagemarkDb: id, title, url, position
+ * @param {object} callback 
+ */
 function saveToStorage(callback){
-    // Save the data to storage
-    // PagemarkDb: id, title, url, position
     pmData.pagemarkData = PagemarkDb().get();
     chrome.storage.local.set(pmData, function(){
         if(chrome.runtime.lastError){
@@ -58,7 +65,9 @@ function saveToStorage(callback){
     return true;
 }
 
-
+/**
+ * This function outputs debugging information to the console
+ */
 function log(){
     var arg = arguments;
     try{
@@ -72,11 +81,17 @@ function log(){
     }catch(er){;;}
     return true;
 }
-
+/**
+ * This function encodes a unified resource identifier (URI)
+ * @param {string} URI url
+ */
 function pmEncodeURI(URI){
     return encodeURI(URI);
 }
-
+/**
+ * This function decodes a unified resource identifier (URI)
+ * @param {string} URI url
+ */
 function pmDecodeURI(URI){
     return decodeURI(URI);
 }

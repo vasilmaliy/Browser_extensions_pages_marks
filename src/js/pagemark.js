@@ -6,7 +6,10 @@ var delay = 250;
 var curUrl = "";
 var curPos = 0;
 var curTabId = "";
-
+/**
+ * Fires when the active tab in a window changes. 
+ * can listen to onUpdated events so as to be notified when a URL is set
+ */
 chrome.tabs.onActivated.addListener(function(activeInfo) {
     chrome.tabs.query({'active': true, 'windowId': chrome.windows.WINDOW_ID_CURRENT}, function(tabs){
         var obj = {};
@@ -14,7 +17,10 @@ chrome.tabs.onActivated.addListener(function(activeInfo) {
         chrome.tabs.sendMessage(tabs[0].id, obj, function(){});
     });
 });
-
+/**
+ * Event listener to handle the message. This looks the same from a content 
+ *  script or extension page.
+ */
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse){
 //log('pagemark.js',request,sender)
     switch(request.type){
@@ -74,9 +80,10 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse){
     }
 });
 
-
+/**
+ * This function listen for toolbar icon click
+ */
 function pmInit(){
-// Listen for toolbar icon click
     chrome.browserAction.onClicked.addListener(function(tab){
         clickCnt++;
         if(clickCnt > 1){		// Double-click detected
@@ -144,7 +151,11 @@ function pmInit(){
     loadFromStorage();
     return true;
 }
-
+/**
+ * This function save new pagemark
+ * @param {object} obj pagemark information like: id, page title, page url
+ * @param {obj} tab current chrome tab
+ */
 function savePagemark(obj,tab){
     var pmObj = {};
     pmObj.id = obj.id;
@@ -159,7 +170,12 @@ function savePagemark(obj,tab){
     });
     return true;
 }
-
+/**
+ * This function get next pagemark for current page
+ * PagemarkDb: id, title, url, position
+ * @param {string} url url current page
+ * @param {object} currentPos  position on page
+ */
 function getNextPm(url,currentPos){
     // Return the next pagemark position for the page located at url
     var nextPm = {};
@@ -186,10 +202,11 @@ function getNextPm(url,currentPos){
     }
     return nextPm;
 }
-
+/**
+ * This function delete the current pagemark from the database
+ * PagemarkDb: id, title, url, position
+ */
 function deleteCurrentPm(){
-    // Delete the current pagemark from the database
-    // PagemarkDb: id, title, url, position
     var localPms = PagemarkDb({url: curUrl}).order('position').get();
     for(var i=0; i<localPms.length; i++){
         var item = localPms[i];
@@ -208,7 +225,9 @@ function deleteCurrentPm(){
     window.focus();
     return true;
 }
-
+/**
+ * This function delete all pagemarks for this url 
+ */
 function deleteAllPms(){
     // Delete all pagemarks for this url
     PagemarkDb({url: curUrl}).remove();
