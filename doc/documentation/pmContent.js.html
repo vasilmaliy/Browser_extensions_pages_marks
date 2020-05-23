@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: pmContent.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: pmContent.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>// Pagemark
+// pmContent.js (content_scripts)
+
+window.addEventListener('load', pmInit);
+
+window.addEventListener('keydown',function(event){
+    if(event.ctrlKey){
+        var obj = {};
+        obj.type = 'ctrlPressed';
+        obj.curPos = window.pageYOffset;
+        chrome.runtime.sendMessage(obj, function(){});
+    }
+    if(event.altKey){
+        var obj = {};
+        obj.type = 'altPressed';
+        obj.curPos = window.pageYOffset;
+        chrome.runtime.sendMessage(obj, function(){});
+    }
+});
+
+window.addEventListener('keyup',function(event){
+    var obj = {};
+    obj.type = 'keyup';
+    chrome.runtime.sendMessage(obj, function(){});
+});
+/**
+ * Report about new listeners
+ * @listens addListeners
+ */
+
+// Global variables
+var pmData = {};
+var localPms = {};
+var fadeTime;
+
+/**
+ * Function needed to load all previous pagemarks
+ * @returns {boolean} whether everything previous was loaded
+ */
+function pmInit(){
+    loadFromStorage(function(){
+        fadeTime = pmData.fadeTime;
+        // Load all previous pagemarks for the current page
+        // Tell the background page that the webpage has loaded
+        chrome.runtime.sendMessage({type: 'pageLoaded'}, function(response){
+            //showPagemarks();
+        });
+        showPagemarks();
+    });
+    return true;
+}
+
+/**
+ * adds listeners
+ * @returns {boolean} true if listener added
+ */
+function addListeners(){
+    // Don't add listeners to 'chrome' pages
+    var url = document.URL;
+    chrome.runtime.onMessage.addListener(function(request, sender, sendResponse){
+        switch(request.action){
+            case 'setPagemark':
+                if(!checkExistingPms(window.pageYOffset)) break;
+                var id = Date.now();
+                buildPm(window.pageYOffset,id);
+                var obj = {};
+                obj.id = id;
+                obj.url = url;
+                obj.title = document.title;
+                obj.position = window.pageYOffset;
+                sendResponse(obj);
+
+                break;
+            case 'getInfo':
+                var obj = {};
+                obj.url = url;
+                obj.title = document.title;
+                obj.position = window.pageYOffset;
+                sendResponse(obj);
+                break;
+            case 'gotoPagemark':
+                window.scrollTo(0,request.nextPm.position);
+                var pm = document.getElementById(request.nextPm.id);
+                var id = request.nextPm.id;
+                fadeOut(id);
+                break;
+            case 'recountPms':
+                loadFromStorage(function(){
+                    showPagemarks();
+                });
+                break;
+            case 'deletePmNode':
+                var pos = request.pos;
+                var pm = document.getElementById(request.id);
+                pm.parentNode.removeChild(pm);
+                displayMsg("Pagemark removed");
+                loadFromStorage(function(){
+                    showPagemarks();
+                });
+                break;
+            case 'deleteAllPmNodes':
+                var pms = document.getElementsByClassName('pmDiv');
+                // 'pms' is a live HTMLCollection and its length will change after each delete.
+                // So iterate through the  initial length
+                var num = pms.length;
+                for(var i=0; i&lt;num; i++){
+                    pms[0].parentNode.removeChild(pms[0]);
+                }
+                displayMsg("All Pagemarks on this page removed");
+                loadFromStorage(function(){
+                    showPagemarks();
+                });
+                break;
+        }
+    });
+    return true;
+}
+
+/**
+ * Function needed to build pageMark
+ * @param pos receives position of element
+ * @param id receives its id
+ */
+function buildPm(pos,id){
+    var div = document.createElement('div');
+    div.id = id;
+    div.className = 'pmDiv';
+    div.style.position = 'absolute';
+    div.style.right = '0px';
+    div.style.top = pos+"px";
+    div.style.background = '#000080';
+    div.style.border = '2px solid black';
+
+    var imgUrl = chrome.extension.getURL("pmEnd.png");
+    var pmEnd = document.createElement('img');
+    pmEnd.src = imgUrl;
+    //pmEnd.className = 'pmEnd';
+    pmEnd.style.position = 'absolute';
+    pmEnd.style.top = '-2px';
+    pmEnd.style.right = "18px";
+    pmEnd.style.borderBottom = '1px solid black';
+    div.appendChild(pmEnd);
+
+    var span = document.createElement('span');
+    //span.className = 'banner';
+    span.style.color = 'gold';
+    span.style.paddingLeft = '10px';
+    span.style.paddingRight = '10px';
+    span.style.background = '#000080';
+    span.style.font = '20px "Open Sans", sans-serif';
+    span.style.fontWeight = 'bold';
+    div.appendChild(span)
+
+    document.body.appendChild(div);
+    setTimeout(function(){
+        // Wait for the DOM to be completed
+        pmEnd.style.right = (span.offsetWidth-2).toString()+"px";
+    });
+    fadeOut(div.id);
+}
+
+/**
+ * Checking wheteher pageMark exists
+ * @param pos of element
+ * @returns {boolean}
+ */
+function checkExistingPms(pos){
+    // Check to see if we are trying to set a pagemark over or too close to an existing one
+    localPms = PagemarkDb({url: document.URL}).order('position').get();
+    var tot = localPms.length;
+    var ok = true;
+    for(var i = 0; i&lt;tot; i++){
+        var item = localPms[i];
+        var epos = item.position;
+        if(pos >= epos-20 &amp;&amp; pos &lt;= epos+20){
+            displayMsg("Cannot place a pagemark so close to an existing one.");
+            ok = false;
+            var obj = {};
+            obj.action = 'playSound';
+            chrome.runtime.sendMessage(obj, function(){});
+            break;
+        }
+    }
+    return ok;
+}
+
+/**
+ * message to be displayed if we choose pageMark
+ * @param msg we want to show
+ * @returns {boolean}
+ */
+function displayMsg(msg){
+    var div = document.createElement('div');
+    div.className = 'msgDiv';
+    div.style.position = 'absolute';
+    var pos = window.pageYOffset;
+    div.style.top = pos.toString()+'px';
+    div.style.background = '#000080';
+    div.style.border = '2px solid black';
+    div.style.color = 'gold';
+    div.style.font = '20px "Open Sans", sans-serif';
+    div.innerHTML = msg+"&amp;nbsp;&amp;nbsp;&amp;nbsp;";
+
+    var button = document.createElement('button');
+    button.innerText = 'Click here to dismiss';
+    button.addEventListener('click', function(){
+        document.body.removeChild(this.parentNode);
+    });
+    div.appendChild(button);
+    document.body.appendChild(div);
+    return true;
+}
+
+/**
+ * Showing off the element
+ * @param id of this element
+ * @returns {boolean}
+ */
+function fadeOut(id){
+//log(id)
+    var elm = document.getElementById(id);
+    elm.style.opacity = 1;
+    elm.style.display = "block";
+    //fadeTime = pmData.fadeTime;
+    if(fadeTime == 0) return true;
+    var last = +new Date();
+    var tick = function(){
+        elm.style.opacity = +elm.style.opacity - (new Date() - last) / fadeTime;
+        last = +new Date();
+
+        if (+elm.style.opacity > 0){
+            (window.requestAnimationFrame &amp;&amp; requestAnimationFrame(tick)) || setTimeout(tick, 16);
+        }
+    };
+
+    tick();
+}
+
+/**
+ * Showing list of pageMarks
+ * @returns {boolean}
+ */
+function showPagemarks(){
+    // Build the pagemarks for the page
+
+    // 'chrome' pages can't have pagemarks
+    if(document.URL.substr(0, 6) == "chrome"){
+        chrome.runtime.sendMessage({type: 'clearIconBadge'}, function(){});
+        return true;
+    }
+    // PagemarkDb: id, title, url, position
+    localPms = PagemarkDb({url: document.URL}).order('position').get();
+    var tot = localPms.length;
+    for(var i = 0; i&lt;tot; i++){
+        var item = localPms[i];
+        var pos = item.position;
+        var d = document.getElementById(item.id);
+        if(!d){
+            buildPm(pos,item.id);
+        }else{
+        }
+    }
+
+    // Put the text into the spans
+    var cnt = 0;
+    for(var i = 0; i&lt;tot; i++){
+        var item = localPms[i];
+        var div = document.getElementById(item.id);
+        var span = div.childNodes[1];
+        cnt++;
+        var text = cnt.toString()+" of "+tot.toString();
+        span.innerText = text;
+    }
+
+    // Now that the spans are loaded into the DOM, move the end image to the left edge of the span
+    for(var i=0; i&lt;tot; i++){
+        var item = localPms[i];
+        var div = document.getElementById(item.id);
+        var span = div.childNodes[1];
+        var img = div.childNodes[0];
+        img.style.right = (span.offsetWidth-2)+"px";
+    }
+
+    // Set the toolbar icon badge
+    if(localPms.length == 0){
+        chrome.runtime.sendMessage({type: 'clearIconBadge'}, function(){});
+    }else{
+        var obj = {};
+        obj.type = 'setIconBadge';
+        obj.text = localPms.length.toString();
+        obj.url = document.URL;
+        chrome.runtime.sendMessage(obj, function(){});
+    }
+    return true;
+}
+
+function tabFocused(){
+    //log("Tab"+document.title+" is now focused")
+    //console.log(currentPms)
+    return true;
+}
+
+addListeners();
+
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#addListeners">addListeners</a></li><li><a href="global.html#buildPm">buildPm</a></li><li><a href="global.html#checkExistingPms">checkExistingPms</a></li><li><a href="global.html#deleteAllPms">deleteAllPms</a></li><li><a href="global.html#deleteCurrentPm">deleteCurrentPm</a></li><li><a href="global.html#displayMsg">displayMsg</a></li><li><a href="global.html#fadeOut">fadeOut</a></li><li><a href="global.html#getNextPm">getNextPm</a></li><li><a href="global.html#initGlobalData">initGlobalData</a></li><li><a href="global.html#loadFromStorage">loadFromStorage</a></li><li><a href="global.html#log">log</a></li><li><a href="global.html#logMsg">logMsg</a></li><li><a href="global.html#pmData">pmData</a></li><li><a href="global.html#pmDecodeURI">pmDecodeURI</a></li><li><a href="global.html#pmEncodeURI">pmEncodeURI</a></li><li><a href="global.html#pmInit">pmInit</a></li><li><a href="global.html#propsConsole">propsConsole</a></li><li><a href="global.html#savePagemark">savePagemark</a></li><li><a href="global.html#saveToStorage">saveToStorage</a></li><li><a href="global.html#showPagemarks">showPagemarks</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.4</a> on Sat May 23 2020 22:51:35 GMT+0300 (GMT+03:00)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
